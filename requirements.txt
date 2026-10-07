@@ -1,0 +1,5 @@
+# Versions used for the SI calculations and figures (Python 3.12).
+numpy==2.5.3
+scipy==1.18.1
+pyscf==2.14.0
+matplotlib==3.11.1

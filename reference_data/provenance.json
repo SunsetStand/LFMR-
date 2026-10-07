@@ -1,0 +1,72 @@
+{
+  "authors": "Chenxi Wang & Zhihao Cui (advisor)",
+  "origin": "Existing research results, extracted without recalculating complete scans.",
+  "convention": "Uncentered density coupling; no phonon zero-point constant.",
+  "single": {
+    "grid": "alpha=0:0.2:3, omega=0.5",
+    "nelec": [
+      1,
+      0
+    ],
+    "U": 0,
+    "mrpt2_precision_mode": "float64",
+    "mrpt2_external_cut": 1e-08,
+    "frame_recipe": "best LF-HF and CS-start LF-HF seeds",
+    "convergence": "Per-row flags retained; most MRPT2 points remain finite-cutoff estimates."
+  },
+  "multi": {
+    "grid": "alpha=0:0.4:4, omega=0.5 and 5",
+    "nelec": [
+      2,
+      2
+    ],
+    "U": 4,
+    "mrpt2_max_total": 5,
+    "mrpt2_precision_mode": "reconditioned_longdouble",
+    "mrpt2_external_cut": 1e-08,
+    "frame_recipe": "selected LF-HF and uniform CS seeds",
+    "convergence": "M5 numerical acceptance passed; phonon convergence not established."
+  },
+  "ed": "Centered ED energies include the recorded paper-energy shift; retain independent cutoff evidence.",
+  "source_sha256": {
+    "data/fig2b_mrpt2_qcut8.csv": "7c09f4012d4d4d0d3d33a1920a9a7de3b3411a4f71e7bd78567b0706f8f549c3",
+    "data/fig2b_mp2.csv": "c1298c88cf193fa0f55be7b7793570f382472cb0ddb53b2e033a7179cce2e201",
+    "data/fig2b_mr.csv": "db7d168dcd5b7b5a3b12bda60b7b2097ff935636decbf49d029a6e1f02eefe49",
+    "data/fig2d_mr.csv": "07d4f32207beb9899169ab58bdc10cb3a084e19a5e59fc37ebb73e1a7a4dcde5",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/records.csv": "6a38b218a0807fb04ae7a71a796f0fbf7630509c5c87259c57b71aab6c85a4ae",
+    "data/fig2b_mrpt2_qcut8_convergence.csv": "ceb53ec848e2c8d11b254babf9d9b042749c4b8319ad2dbe5abd6bf9c36ce535",
+    "data/fig2b_mrpt2_qcut8_cuts.csv": "f507922e5b8f320303b520aed5ffd02cd0b84c1172fe1a1539e16dd491920228",
+    "data/fig2d_mrpt2_qcut8_convergence.csv": "2fc551932eed7c41b916cff6df268c8f407f072c65771ac01537a32c501bfb24",
+    "data/fig2d_mrpt2_qcut8_cuts.csv": "9d1155d63b3640cbcd05c8bd5c009f27c12e6313d93ed72e80e4e54490eeec17",
+    "data/fig2b_mrpt2_ed.csv": "ebbb4d085ed0fb7cd446c790f9d860e07abcc7f02e2986af2a9b06be753fdbb9",
+    "data/fig2b_mrpt2_ed_convergence.csv": "f6b9b33a046c72856e605cec8e890120f8715a6cddfaf5b83de868f3d42e18ed",
+    "data/fig2d_exact.csv": "9539331ff69c681c3d5b39ba0383f96b84eef9872b7d2628abcc892bb1bd8026",
+    "data/fig2d_exact_convergence.csv": "c106a0244409957022cd5ee1ec3b9a801acf91c8e037045d65fa4de94d65b3ed",
+    "data/fig2b_mr_worst_convergence.csv": "e921e8c31279c68b304b8cdb054b94ced236381ee0bb1b94716f64d693835d7a",
+    "data/fig2b_mr_broken_seed.csv": "53a12af081db733335cf2faa11cb341d587c5d839dbab2a7f04516efdbfd686c",
+    "data/fig2b_mrpt2_frames.npz": "9589d1a93dcf625b1e6b4a30b4fae3d533360064452bb6435f7fd647861c778f",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w0.5_a0/inputs.npz": "a8c8bbda5f010e287ba7ed1a954d95450c1df88a218cbc57498dba70f11deb3b",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w0.5_a0.4/inputs.npz": "b141f576c62e026db8116fe07f3a9858b72bd03adefd38b7580b4565d4a949ae",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w0.5_a0.8/inputs.npz": "01fc6a8829ee27317ac9bc3272eee8f4e350c7d79dace215e0cfb7e35f9ed5fa",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w0.5_a1.2/inputs.npz": "64d986d801b577341b270abacb559519aef5fc9525a50ddddf23cba6d910ef39",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w0.5_a1.6/inputs.npz": "01a21a6cf1efe4233427e3f2f9e4438e2ec03b2950bc84895594c7a1e88b5259",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w0.5_a2/inputs.npz": "f361b91490b7bab9644049ff8f0bf360989b7e65b36ddd80d9b50a25a069617e",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w0.5_a2.4/inputs.npz": "dfc6825b69e630c98eda781e3c8c7983f010ff4d8f1e7a38968b25e5d08bad24",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w0.5_a2.8/inputs.npz": "f2b5c67fae1bb04732236c5ed6f5f487af0e1d98964179b7521150aacb91c458",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w0.5_a3.2/inputs.npz": "e1f587c2fd974bb6fa1c6352265231001087dd5904f1213219a338875a61e947",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w0.5_a3.6/inputs.npz": "f784ed30731aa99af524730dc0cdb7613d7643daac1e8e8cd70b755018f281e5",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w0.5_a4/inputs.npz": "fd154dafdecc30b5d92971943bebe8509601cc063b857c8777e4204cee00bac3",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w5_a0/inputs.npz": "a8c8bbda5f010e287ba7ed1a954d95450c1df88a218cbc57498dba70f11deb3b",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w5_a0.4/inputs.npz": "7cf6e7ff18ae9a923e911d83a690f138e2a697f47037bd7c4b1e12d4fa6aa186",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w5_a0.8/inputs.npz": "46d0a39b0d75132ed288f085664e5f083b9448016fbedc753c0eee44894e0979",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w5_a1.2/inputs.npz": "7ced38867b47e7327aff4e02ad5f53f17a11352c0292ce7fcb093ba0f3886c73",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w5_a1.6/inputs.npz": "cfdc1d16bdfffb700502f613122adb235c1463df2585fb62813dcb1001a59a84",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w5_a2/inputs.npz": "1a95d71609c6fcba5754617fcec9ef026f62f94b931407ae1d372623d794469d",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w5_a2.4/inputs.npz": "9ef5d1c753c9180b0edbd4f60ba3e2795b6b907008829120f215db5c8d249f5e",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w5_a2.8/inputs.npz": "aef455e10ace02c1086ce07f6d9a0de12da59bb714778772fd835643ee2321ce",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w5_a3.2/inputs.npz": "c78917a904e4087f0a94202b3d64285b9f7b3eba27d47b6998de2ec3c86bc91f",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w5_a3.6/inputs.npz": "679e4907631c9fe9efd6a194018c2bba8caf0a4fe310c635e47f753b19abad9b",
+    "data/mrpt2_diagnostics/alpha_scan_M5_v1/points/w5_a4/inputs.npz": "5bb2e23b0ce12cf7b0ea6cbd837a442f6ad914fb0a0b0d660e47615c9a81fe01",
+    "data/fig2d_lf_references.npz": "ef3ebbf72e0b1bf07b0cfff65321e940607657c7833bc856909ccd11197eb831"
+  }
+}

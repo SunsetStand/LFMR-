@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mr-lf"
+version = "1.0.0"
+description = "Hubbard–Holstein exact, coherent-state and multireference Lang–Firsov methods"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+authors = [{name = "Chenxi Wang"}, {name = "Zhihao Cui (advisor)"}]
+dependencies = ["numpy==2.5.3", "scipy==1.18.1", "pyscf==2.14.0"]
+
+[project.optional-dependencies]
+plot = ["matplotlib==3.11.1"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mr_lf*"]
+exclude = ["examples*"]
+
+[tool.ruff]
+line-length = 100

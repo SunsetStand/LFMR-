@@ -1,0 +1,8 @@
+{
+  "origin": "Computed using mr_lf.scf.cs and mr_lf.mp.cs",
+  "starts": "AFM, CDW, hopping eigenvectors, previous-point orbitals",
+  "gtol": 1e-08,
+  "max_cycle": 1000,
+  "stationarity_tolerance": 1e-07,
+  "energy_convention": "paper_uncentered_no_zero_point"
+}
