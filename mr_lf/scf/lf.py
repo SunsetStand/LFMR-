@@ -6,6 +6,7 @@ from scipy import optimize as scipy_optimize
 
 from .. import _orbitals
 from .._driver import Calculation, require_reference
+from ..model import ElectronPhononModel
 from ..phonon import lf_franck_condon
 from .cs import cs_site_density
 
@@ -913,6 +914,14 @@ class LFHF(Calculation):
     def kernel(self, mo_coeff0=None, lam0=None):
         self._reset()
         m = self.model
+        if isinstance(m, ElectronPhononModel):
+            from .general_lf import optimize_reference
+
+            result = optimize_reference(m, mo_coeff0, lam0, gtol=self.gtol,
+                                        max_cycle=self.max_cycle)
+            self.lam, self.shift = result["lam"], result["shift"]
+            self.mo_coeff, self.mo_energy = result["mo_coeff"], result["mo_energy"]
+            return self._finish(result, result["energy"], result["converged"])
         coeff0 = _orbitals.initial_orbitals(m, mo_coeff0)
         if lam0 is None:
             lam0 = np.full((m.L, m.L), m.g / (m.omega * m.L), dtype=np.float64)

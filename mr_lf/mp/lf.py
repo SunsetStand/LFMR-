@@ -5,6 +5,7 @@ from itertools import combinations
 import numpy as np
 
 from .._driver import Calculation, require_reference
+from ..model import ElectronPhononModel
 from ..phonon import lf_total_phonon_configurations, lf_vacuum_coupling_site_matrices
 from ..scf.lf import LFHF, lf_effective_one_body, lf_hf_multi_fixed_energy, lf_hf_multi_fixed_fock
 
@@ -670,19 +671,27 @@ def lf_mp2_unrestricted_reference_point(
 
 
 class LFMP2(Calculation):
-    def __init__(self, hf, *, max_total=10, max_excited_modes=2, denominator_tol=1e-10):
+    def __init__(self, hf, *, max_total=10, max_excited_modes=None, denominator_tol=1e-10):
         if not isinstance(hf, LFHF):
             raise TypeError("LFMP2 requires an LFHF reference")
         super().__init__(hf.model)
         self.hf = hf
         self.max_total = max_total
-        self.max_excited_modes = max_excited_modes
+        self.max_excited_modes = (hf.model.nmode if isinstance(hf.model, ElectronPhononModel)
+                                 else 2) if max_excited_modes is None else max_excited_modes
         self.denominator_tol = denominator_tol
 
     def kernel(self):
         self._reset()
         require_reference(self.hf)
         m, hf = self.model, self.hf
+        if isinstance(m, ElectronPhononModel):
+            from .general_lf import correction
+
+            result = correction(hf, max_total=self.max_total,
+                                max_excited_modes=self.max_excited_modes,
+                                denominator_tol=self.denominator_tol)
+            return self._finish(result, result["total_energy"], True, result["mp2_correction"])
         # The original one-electron all-mode path has its own effective
         # orbital partition. Its cutoff is a total occupation cutoff only.
         if sum(m.nelec) == 1:

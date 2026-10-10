@@ -5,6 +5,7 @@ from pyscf import lib
 
 from ._driver import Calculation, require_reference
 from .basis import make_electron_basis, make_shape
+from .model import ElectronPhononModel
 from .phonon import boson_operators, phonon_configs
 
 
@@ -298,6 +299,8 @@ class ExactED(Calculation):
             raise ValueError("nmax must be a nonnegative integer")
         if coupling_convention not in ("paper", "centered"):
             raise ValueError("coupling_convention must be paper or centered")
+        if isinstance(model, ElectronPhononModel) and coupling_convention != "paper":
+            raise ValueError("general integral models use only their supplied uncentered coupling")
         for name, value in [("tol", tol), ("tol_residual", tol_residual), ("lindep", lindep)]:
             if not np.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be finite and positive")
@@ -308,6 +311,21 @@ class ExactED(Calculation):
     def kernel(self):
         self._reset()
         m = self.model
+        if isinstance(m, ElectronPhononModel):
+            from .general_ed import solve
+
+            energy, coeff, residual = solve(
+                m, self.nmax, tol=self.tol, tol_residual=self.tol_residual,
+                max_cycle=self.max_cycle, max_space=self.max_space, lindep=self.lindep,
+            )
+            result = {
+                "energy": energy, "coeff": coeff, "residual": residual,
+                "nmax": self.nmax, "dimension": coeff.size,
+                "norb": m.norb, "nmode": m.nmode, "nelec": m.nelec, "ecore": m.ecore,
+                "solver_converged": residual < self.tol_residual,
+                "cutoff_converged": False, "coupling_convention": "paper",
+            }
+            return self._finish(result, energy, result["solver_converged"])
         energy, coeff, residual = kernel(
             m.tmat,
             m.U,
@@ -339,4 +357,5 @@ class ExactED(Calculation):
         require_reference(self)
         from .observables import exact_site_density
 
-        return exact_site_density(self.result["coeff"], self.model.L, self.model.nelec)
+        norb = self.model.norb if isinstance(self.model, ElectronPhononModel) else self.model.L
+        return exact_site_density(self.result["coeff"], norb, self.model.nelec)

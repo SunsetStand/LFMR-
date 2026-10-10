@@ -76,6 +76,200 @@ $(A d_e+I_{\rm addr})N+k$. All six overlap/Hamiltonian blocks use the same
 bra/ket order. Exact ED uses the site/Fock tensor; single-reference LF-MP2
 uses canonical MOs.
 
+### General molecular integral interface (adapter stage)
+
+The integral data objects extend the Hamiltonian definition to
+
+$$
+\hat H=E_{\rm core}
++\sum_{pq\sigma}h_{pq}a^\dagger_{p\sigma}a_{q\sigma}
++\frac12\sum_{pqrs\sigma\tau}V_{pqrs}
+a^\dagger_{p\sigma}a^\dagger_{r\tau}a_{s\tau}a_{q\sigma}
++\sum_x\omega_x b_x^\dagger b_x
++\sum_{xpq\sigma}g^x_{pq}a^\dagger_{p\sigma}a_{q\sigma}(b_x+b_x^\dagger).
+$$
+
+Here $p,q,r,s$ label a fixed orthonormal electronic basis, distinct from
+canonical MO indices, and $x$ labels an independent harmonic mode.
+`h1e=(norb,norb)`, `eri=(norb,norb,norb,norb)`,
+`coupling=(nmode,norb,norb)` and `omega=(nmode,)` are real `float64` arrays.
+The full chemists' tensor is $V_{pqrs}=(pq|rs)$; no permutation compression
+is applied by the data object. All electron counts are explicit alpha/beta
+tuples. The uncentered coupling has no zero-point constant or additional
+frequency/mass factors. $E_{\rm core}$ is nuclear repulsion for molecules
+and zero for the lattice model.
+
+Let $S$ be the nonorthogonal AO overlap and let the columns of $X$ define
+the new orbitals $|p\rangle=\sum_\mu|\mu\rangle X_{\mu p}$.
+The adapter directly calls PySCF symmetric Löwdin orthogonalization,
+
+$$
+X=S^{-1/2},\qquad X^TSX=I,\qquad
+h=X^Th_{\rm AO}X,\qquad g^x=X^Tg^x_{\rm AO}X,
+$$
+
+and PySCF AO2MO for
+
+$$
+V_{pqrs}=\sum_{\mu\nu\kappa\ell}
+X_{\mu p}X_{\nu q}X_{\kappa r}X_{\ell s}(\mu\nu|\kappa\ell).
+$$
+
+The smallest/largest overlap eigenvalue ratio must exceed $10^{-10}$.
+Otherwise construction raises; no orbitals are deleted. All electronic
+orbitals are retained, with no frozen-core or active-space approximation.
+This symmetric Löwdin choice differs from the meta-Löwdin basis used in
+Cui et al.; matching that convention is needed for comparing approximate
+LF molecular energies with the paper.
+
+For an orbital matrix and density matrix in the two representations,
+
+$$
+C_{\rm AO}=XC,\qquad C=X^TSC_{\rm AO},\qquad
+D_{\rm AO}=XDX^T,\qquad D=X^TSD_{\rm AO}SX.
+$$
+
+Cyclicity of the trace then gives
+
+$$
+\operatorname{Tr}(g^x_{\rm AO}D_{\rm AO})
+=\operatorname{Tr}(X^Tg^x_{\rm AO}XD)
+=\operatorname{Tr}(g^xD).
+$$
+
+This invariance, same-state UHF energies evaluated with PySCF J/K, and
+PySCF FCI energies in both bases validate the adapter's coordinate and
+energy bookkeeping. They do not validate a molecular LF approximation.
+The original molecule is retained by reference while all integral arrays
+and the AO metric are snapshots; rebuild the model after changing the molecule.
+
+For the lattice conversion, $h=t$, $V_{pppp}=U$, and
+$g^x_{pq}=g\delta_{xp}\delta_{pq}$. The two opposite-spin terms, together
+with the factor $1/2$, give $U n_{p\alpha}n_{p\beta}$; same-spin terms
+vanish. This recovers the Hamiltonian above without an energy shift.
+
+The general integral paths now support ED and a limited LF-HF/MP2
+calculation. The lattice formulas in the remainder of this document keep
+their original specialization. General MR/PT2, molecular symmetry restoration,
+Hessians and reference-selection studies are subsequent work.
+
+### General-integral ED and density-diagonal LF reference
+
+ED retains the structured state
+`(nstr_alpha,nstr_beta)+(nmax+1,)*nmode`. PySCF `direct_nosym` applies
+the electronic one/two-body operators and each general coupling matrix;
+number energies and independent local oscillator ladders act on the phonon
+axes. The independently derived determinant/Fock diagonal is
+
+$$
+H_{I\mathbf n,I\mathbf n}=E_{\rm core}+\sum_p h_{pp}N_p(I)
++\frac12\sum_{pq}(pp|qq)N_p(I)N_q(I)
+-\frac12\sum_{pq\sigma}(pq|qp)n_{p\sigma}(I)n_{q\sigma}(I)
++\sum_x\omega_x n_x.
+$$
+
+The linear coupling has zero number-state diagonal, including off-diagonal
+electronic couplings. Davidson uses this preconditioner; a separate
+Hamiltonian action evaluates the final residual. Neither ED matrix is stored.
+The initial vector has reproducible full support; a lowest-diagonal basis
+vector alone can converge in a higher disconnected block. The PySCF
+preconditioner has a finite level shift to avoid nearly dependent corrections
+in diagonal problems, and the final residual uses a normalized state.
+
+The LF ansatz in the same fixed electronic basis is
+
+$$
+|\Psi_{\rm LF}\rangle=U|\Phi_C,0\rangle,\qquad
+U=\exp\left[\sum_x\left(z_x-\sum_p\lambda_{xp}n_p\right)
+(b_x^\dagger-b_x)\right],\qquad \lambda\in\mathbb R^{n_{\rm mode}\times n_{\rm orb}}.
+$$
+
+Write $d_{xpq}=\lambda_{xp}-\lambda_{xq}$,
+$F_{pq}=\exp[-\frac12\sum_x d_{xpq}^2]$ and $G^x_{pq}=g^x_{pq}F_{pq}$.
+The exact vacuum average $\langle0|U^\dagger HU|0\rangle$ has scalar
+$E_{\rm core}+\sum_x\omega_xz_x^2$ and one-body tensor
+
+$$
+\bar h_{pq}=h_{pq}F_{pq}
++\sum_xG^x_{pq}(2z_x-\lambda_{xp}-\lambda_{xq})
++\delta_{pq}\sum_x\omega_x(\lambda_{xp}^2-2z_x\lambda_{xp}).
+$$
+
+Its full chemists' two-body tensor is
+
+$$
+\begin{aligned}
+\bar V_{pqrs}={}&V_{pqrs}\exp[-\tfrac12\sum_x(d_{xpq}+d_{xrs})^2]
++2\delta_{pq}\delta_{rs}\sum_x\omega_x\lambda_{xp}\lambda_{xr}\\
+&-2\delta_{rs}\sum_xG^x_{pq}\lambda_{xr}
+-2\delta_{pq}\sum_x\lambda_{xp}G^x_{rs}.
+\end{aligned}
+$$
+
+These formulas agree with POLAR's
+[`get_glf_ham_non_loc_h_ep`](https://github.com/zhcui/polar_preview/blob/master/polar/lang_firsov/lang_firsov.py)
+and are independently tested against spin-bit Hamiltonians transformed
+with large oscillator exponentials. The tensor retains pair exchange and
+simultaneous Hermitian reversal, but generally loses separate $p\leftrightarrow q$
+symmetry. It must remain full when passed to PySCF J/K or contractions.
+
+PySCF UHF evaluates determinant energies, Fock matrices and orbital
+stationarity; numerical-gradient BFGS jointly optimizes occupied/virtual
+rotations and lambda. At fixed $N_e>0$ the map
+$\lambda_{xp}\mapsto\lambda_{xp}+c_x$,
+$z_x\mapsto z_x+N_ec_x$ leaves $U$ unchanged on the electronic sector.
+Thus setting $z=0$ loses no coherent displacement freedom. This phase uses
+one start per solver call, with explicit multi-start branch comparisons in
+the molecular example. Independent physical gradients, rather than the
+optimizer return code, determine convergence; a Hessian test is not performed.
+
+### Finite-electronic-space general LF-MP2
+
+For electronic determinants $I,J$ in the fixed basis define
+$\eta_{Ix}=z_x-\sum_p\lambda_{xp}N_p(I)$ and
+$\delta_{IJ,x}=\eta_{Jx}-\eta_{Ix}$. The infinite-oscillator overlaps are
+
+$$
+A_{IJ}(\mathbf n)=e^{-\frac12\sum_x\delta_{IJ,x}^2}
+\prod_x\frac{\delta_{IJ,x}^{n_x}}{\sqrt{n_x!}}.
+$$
+
+Let $H^e_{IJ}$ exclude the scalar offset and let $G^x_{IJ}$ be the electronic
+matrix of $\sum_{pq\sigma}g^x_{pq}a^\dagger_{p\sigma}a_{q\sigma}$. Then
+
+$$
+\begin{aligned}
+B_{IJ}(\mathbf n)={}&H^e_{IJ}A_{IJ}(\mathbf n)\\
+&+\sum_xG^x_{IJ}\left[(\eta_{Ix}+\eta_{Jx})A_{IJ}(\mathbf n)
++\sqrt{n_x}A_{IJ}(\mathbf n-\mathbf e_x)\right]\\
+&+\delta_{IJ}\delta_{\mathbf n,0}
+\left(E_{\rm core}+\sum_x\omega_x\eta_{Ix}^2\right)
++\delta_{IJ}\sum_x\delta_{\mathbf n,\mathbf e_x}\omega_x\eta_{Ix}.
+\end{aligned}
+$$
+
+The lower-occupation term is zero when $n_x=0$. Multiplying $B$ by the
+reference CI vector and rotating to canonical MOs with PySCF yields
+$M_{\mu\mathbf n}=\langle\Phi_\mu,\mathbf n|U^\dagger HU|\Phi_0,0\rangle$.
+The second-order correction is
+
+$$
+E^{(2)}=-\sum_{(\mu,\mathbf n)\ne(0,0)}
+\frac{|M_{\mu\mathbf n}|^2}{\sum_{a\in\mu}\epsilon_a-\sum_{i\in\mu}\epsilon_i
++\boldsymbol\omega\cdot\mathbf n}.
+$$
+
+Electronic ranks 0, 1 and 2 occur for nonzero phonon occupation, including
+**phonon-dressed doubles**. Vacuum excitations have ranks 1 and 2; higher
+ranks are checked numerically. Excitation denominators must be positive.
+The first version explicitly builds electronic matrices (at most 256
+determinants), with no oscillator displacement cutoff. `max_total` truncates
+the perturbative sum; `max_excited_modes` is optional and defaults to all
+modes for general models. Finite-sum success does not establish cutoff
+convergence or reliability near a small denominator. Every spin sector uses
+the canonical UHF Fock partition, which differs from the archived
+one-electron lattice partition.
+
 ### Centered coupling and cutoff conventions
 
 A centered ED calculation replaces $n_x$ by $n_x-N_e/L$.

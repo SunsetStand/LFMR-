@@ -91,6 +91,80 @@ geometry, NOCI, response equations and precision repair. Computational
 kernels do not read scan files or import examples. Low-level functions can
 be imported directly; see [API documentation](docs/API.md).
 
+## Molecular integrals and limited ED/LF-HF/MP2 support
+
+`MolecularEP` obtains molecular electronic integrals directly from PySCF and
+combines them with supplied linear harmonic-mode parameters. It uses a fixed
+symmetric Löwdin electronic basis and allows different electronic orbital
+and phonon mode counts. Constructing it does not run SCF:
+
+```python
+import numpy as np
+from pyscf import gto
+from mr_lf import ExactED, LFHF, LFMP2, MolecularEP
+
+mol = gto.M(atom="H 0 0 0; H 0 0 0.74", basis="sto-3g", verbose=0)
+omega = np.array([0.5])  # Hartree
+g_ao = np.zeros((1, mol.nao_nr(), mol.nao_nr()))  # replace with supplied coupling
+model = MolecularEP(mol, omega=omega, coupling_ao=g_ao)
+print(model.nelec, model.h1e.shape, model.eri.shape, model.coupling.shape)
+# (1, 1) (2, 2) (2, 2, 2, 2) (1, 2, 2)
+ed = ExactED(model, nmax=8, max_space=40, lindep=1e-22)
+ed.kernel()
+hf = LFHF(model, gtol=1e-8)
+hf.kernel()
+pt = LFMP2(hf, max_total=8)
+pt.kernel()
+```
+
+`coupling_ao` contains AO matrix elements multiplying `b_x+b_x†`, in Hartree,
+with any coordinate normalization already included. `model.ecore` stores
+nuclear repulsion separately, with no phonon zero-point constant.
+`ElectronPhononModel` accepts the corresponding orthonormal integral arrays
+directly; `HubbardHolstein.to_general()` converts the existing lattice model.
+Both new model types own copied arrays. Recreate a molecular model after
+changing geometry or basis. Near-dependent AOs raise rather than being removed.
+
+`ExactED`, `LFHF` and `LFMP2` accept both integral models. ED uses PySCF's
+uncompressed electronic contractions and Davidson; LF-HF uses PySCF UHF/J/K
+with analytic vacuum integrals and numerical joint orbital/LF optimization.
+The first general LF-MP2 implementation is limited to **256 electronic
+determinants**, includes all phonon-dressed electronic singles and doubles,
+and requires positive canonical Fock excitation denominators. Phonon cutoffs
+need separate convergence checks. CS, MR and MRPT2 remain lattice methods.
+General gradients, Hessians, molecular symmetry restoration and MR reference
+selection are subsequent work.
+The [API](docs/API.md#general-integral-model-and-molecular-adapter) specifies
+shapes and lifecycle, and the [theory](docs/theory.md#general-molecular-integral-interface-adapter-stage)
+derives the basis and density maps.
+
+Adapter acceptance is maintained outside the standalone release, alongside
+the existing migration checks. From the parent research workspace, run:
+
+```bash
+python -m pytest -q tests/test_molecular_adapter.py tests/test_molecular_solvers.py tests/test_si_release.py
+```
+
+Adapter checks cover closed-shell H2 and open-shell
+H3/STO-3G orthogonality, coupling expectations, same-state UHF energy and
+PySCF FCI energy invariance, Hubbard mapping, input ownership and failure
+cases. Solver checks independently construct spin-bit Hamiltonians and
+large-oscillator displacement exponentials, compare zero-coupling energies
+with PySCF FCI/UHF/UMP2, and verify symmetry partners and small perturbed starts.
+
+For a small symmetry experiment, run from `si/`:
+
+```bash
+python -m examples.molecular_symmetry --output outputs/molecular_symmetry
+```
+
+This supplies an artificial odd mode `g*(n_0-n_1)*(b+b†)` to H2/STO-3G;
+it is not a computed vibrational or cavity Hamiltonian. The CSV, JSON, frame
+arrays and plots record initial-state dependence, charge/spin order parameters,
+combined electronic/phonon parity, stationarity and both cutoff histories.
+The [POLAR implementation](https://github.com/zhcui/polar_preview) provided
+the general LF integral reference; it is not a runtime dependency.
+
 ## Reproduce the main figures
 
 The compact results and frame parameters in `reference_data` allow immediate
