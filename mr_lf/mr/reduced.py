@@ -29,10 +29,11 @@ merged under F; Hamiltonian couplings between groups are all retained.
 import numpy as np
 
 from .. import basis
+from ..model import HubbardHolstein
 from ..phonon import multimode_displacement_overlap, multimode_phonon_operator_matrices
 from ..symmetry import _translation_electron_labels
 from . import linalg
-from .kernels import build_projected_mr_candidate_blocks
+from .kernels import _validate_mr_candidate_inputs, build_projected_mr_candidate_blocks
 
 
 def _electronic_tables(tmat, nsite, nelec):
@@ -293,8 +294,34 @@ def build_reduced_projected_blocks(
     returns the raw H block between two candidate-label index lists, so the
     solver can contract one Gram-group pair at a time.
     """
+    if not isinstance(model, HubbardHolstein):
+        raise TypeError("reduced lattice MRPT2 requires a HubbardHolstein model")
+    _validate_mr_candidate_inputs(model.tmat, model.U, model.g, model.omega,
+                                  lam, shift, model.nelec, occupations)
     nsite, nelec = model.L, model.nelec
-    occ = np.asarray(occupations, dtype=np.int64)
+    if (isinstance(character, (bool, np.bool_))
+            or not isinstance(character, (int, np.integer))
+            or character not in (-1, 1) or (character == -1 and nsite % 2)):
+        raise ValueError("character must be +1, or -1 for even L")
+    if not np.allclose(model.tmat, np.roll(model.tmat, 1, axis=(0, 1)), atol=1e-12, rtol=0):
+        raise ValueError("tmat must be translation invariant")
+    if parity is not None and (isinstance(parity, (bool, np.bool_))
+                               or not isinstance(parity, (int, np.integer))
+                               or parity not in (-1, 1)):
+        raise ValueError("parity must be None, +1 or -1")
+    if parity is not None and nelec[0] != nelec[1]:
+        raise ValueError("spin-exchange parity requires equal spin counts")
+    for name, flag in (("overlap_only", overlap_only), ("grouped_overlap", grouped_overlap),
+                        ("defer_h", defer_h)):
+        if not isinstance(flag, (bool, np.bool_)):
+            raise TypeError(f"{name} must be bool")
+    if defer_h and not grouped_overlap:
+        raise ValueError("defer_h requires grouped_overlap")
+    occ = occupations.copy()
+    if len(np.unique(occ, axis=0)) != len(occ):
+        raise ValueError("reduced occupations must be unique")
+    if len(occ):
+        _config_permutations(occ)
     tables = _electronic_tables(model.tmat, nsite, nelec)
     labels, kinds = reduced_candidate_labels(lam, shift, nelec, occ, character, parity, tables[3])
     groups = _merged_groups(nsite, nelec, tables[3] if parity is not None else None)
@@ -567,6 +594,15 @@ def lean_mrpt2(
     from .pt2 import _validate_mrpt2_gaps
     from .space import _check_positive_semidefinite
 
+    for name, value in (("reference_cut", reference_cut), ("external_cut", external_cut)):
+        if (isinstance(value, (bool, np.bool_))
+                or not isinstance(value, (int, float, np.integer, np.floating))
+                or not np.isfinite(value) or value <= 0):
+            raise ValueError(f"{name} must be finite and positive")
+    if (isinstance(external_scale, (bool, np.bool_))
+            or not isinstance(external_scale, (int, float, np.integer, np.floating))
+            or not np.isfinite(external_scale) or external_scale < 0):
+        raise ValueError("external_scale must be finite and nonnegative")
     s_rt, h_rr, h_rt = blocks["s_rt"], blocks["h_rr"], blocks["h_rt"]
     s_groups = blocks["s_tt_groups"]
     rg, tg = info["reference_groups"], info["external_groups"]
