@@ -14,6 +14,8 @@ Physical object inputs are real. The model owns a copied, symmetric
 `float64` hopping matrix; supplied orbital/frame arrays must be finite
 `float64`. Integer occupations are `int64`. Arrays use C order.
 Low-level functions retain their documented dtype/shape contracts.
+In particular, the active electronic symmetry utility also accepts
+`complex128` CI while retaining a real orthogonal orbital action.
 Results are ordinary NumPy/scalar dictionaries and are not automatically
 JSON-serializable.
 
@@ -89,6 +91,91 @@ paths require `norb<64` and pair-exchange/real-Hermitian ERIs,
 full tensors; individual-pair Coulomb symmetry is not assumed after LF
 transformation. CS, MR and MRPT2 still require `HubbardHolstein`.
 
+### Molecular Pauli-Fierz integrals
+
+`MolecularPF(mol, *, omega, polarization, lambda_c, origin=None)` inherits
+`MolecularEP` and is exported from `mr_lf`. It accepts a built all-electron
+PySCF Mole with positive fixed electron number, without ECP/pseudopotentials.
+It does not run SCF or modify the input molecule.
+
+`omega` has shape `(M,)` and positive frequencies in Hartree;
+`polarization` has shape `(M,3)` and real unit Cartesian vectors;
+`lambda_c` has shape `(M,)` and nonnegative strengths in atomic units.
+Arrays/lists of real numeric data are copied to finite `float64` arrays.
+Polarization squared norms must equal one within absolute tolerance `1e-12`;
+they are not silently normalized. Zero modes require arrays of shapes
+`(0,)`, `(0,3)` and `(0,)`.
+
+`origin` is a finite `(3,)` position in **Bohr**, independently of `mol.unit`.
+Omission selects the nuclear-charge center. In the fixed Ne sector,
+`dipole_orth[k] = position_orth[k] - nuclear_dipole[k]/Ne * I` subtracts
+the nuclear scalar once. Rebuild after changing the electron sector.
+The coupling is `-sqrt(omega[x]/2)*lambda_c[x]*projected_dipole[x]`.
+Both `h1e` and `eri` already contain the projected-dipole-product DSE;
+`ecore` remains nuclear repulsion alone. Do not add another DSE, nuclear
+dipole constant, zero-point energy or lattice centering correction.
+
+Additional attributes are `origin`, `nuclear_dipole`: `(3,)`;
+`polarization`: `(M,3)`; `lambda_c`: `(M,)`;
+`dipole_orth`: `(3,norb,norb)`; `projected_dipole`: `(M,norb,norb)`;
+`h1e_dse`: `(norb,norb)`; and
+`dse_convention='projected_dipole_product'`. The four-index DSE is not stored
+separately. Eq. (10)'s quadrupole correction is not included.
+See the [derivation and runnable examples](molecular_symmetry.md).
+
+### Molecular group data and active electronic CI
+
+`point_group_data(name)` returns validated MolSym finite-group data:
+`operations: float64 (G,3,3)`, `multiplication: int64 (G,G)`, and
+`irrep_matrices[label]: complex128 (G,d,d)`, plus `name` and `order`.
+Labels and operation ordering follow MolSym. Continuous groups require a
+finite subgroup. This optional backend requires `mr-lf[symmetry]`.
+
+`molecular_point_group(mol, *, subgroup=None, tolerance=1e-8)` returns
+`group`, `origin: (3,)` in Bohr, `atom_map: int64 (G,natom)`,
+`overlap_ao`, `ao_to_orth`: `(norb,norb)`, and
+`ao_actions`, `orbital_actions`: `(G,norb,norb)`.
+Actions satisfy `U[q,p]` = output coefficient q of rotated input orbital p.
+The AO action preserves S; the Lowdin action is orthogonal. Atom mappings
+and the actual AO basis are checked. Spherical AOs are required; linear
+molecules need an explicit finite subgroup, e.g. `subgroup='D2h'` for H2.
+Returned arrays are owned read-only snapshots. Construction performs no SCF.
+
+`apply_electronic_symmetry(ci, norb, nelec, orbital_action)` actively rotates
+CI with PySCF's passive interface supplied `orbital_action.T`.
+`norb` is an integer in `[1,63]`; `nelec=(Na,Nb)` is an explicit integer
+tuple with counts in `[0,norb]`. Bools are invalid. `ci` is finite NumPy
+`float64` or `complex128 (comb(norb,Na),comb(norb,Nb))`; `orbital_action`
+is finite NumPy `float64 (norb,norb)`, orthogonal within absolute tolerance
+`1e-12`. Incorrect shapes are rejected, not reshaped. Read-only and strided
+inputs are accepted unchanged; the result is an owned C-order same-dtype
+array. Unsupported array types/dtypes raise `TypeError`; other contract
+violations raise `ValueError`. This function itself does not require MolSym.
+
+These functions supply electronic basis actions. The joint factories below
+also validate the cavity Hamiltonian.
+
+### Joint electron/photon point groups
+
+`molecular_cavity_symmetry(model, *, subgroup=None, tolerance=1e-9)` accepts
+`MolecularPF` and returns a read-only `JointSymmetry` snapshot. Linear
+molecules require a finite parent, e.g. `subgroup="D2h"`. The parent is
+filtered to the closed subgroup preserving electronic integrals, photon
+frequencies and coupling. Degenerate photon modes may mix. A charged
+off-center dipole origin can reduce this group because affine photon
+translations are outside this interface.
+
+`joint_symmetry(model, group, orbital_actions, photon_actions, *,
+tolerance=1e-9)` validates an explicit representation against general
+integral data. `group` is `PointGroupData`; actions are real arrays
+`(G,norb,norb)` and `(G,nmode,nmode)`, respectively. Both obey the group
+table and orthogonality, and `Q` commutes with the frequency matrix.
+`JointSymmetry.group`, `.orbital_actions` and `.photon_actions` share an
+operation order. Factory outputs own read-only copies. Rebuild snapshots
+after modifying model data. Use exact irrep labels in
+`list(symmetry.group.irrep_matrices)`; MolSym uses `A_1g` for the fully
+symmetric D2h representation and `A_1'` for D3h.
+
 ## Mean-field references
 
 `CSHF(model, *, gtol=1e-8, max_cycle=1000)`:
@@ -137,12 +224,12 @@ For `ElectronPhononModel`/`MolecularEP`, LF-HF instead uses:
 
 `site_density()` returns a copy of the `(2,L)` spin-resolved site density
 for a converged HF object. Both drivers optimize one start. Multi-start
-branch selection is explicit in `examples.scan`, allowing callers to choose
+branch selection is explicit in `benchmarks.si.scan` in the external research repository, allowing callers to choose
 and audit their own reference recipe.
 
 For general models, `site_density()` means occupation of the fixed
 orthonormal basis and has shape `(2,norb)`; it is not an atomic population
-analysis. `examples.molecular_symmetry` records six starts, the constrained
+analysis. `benchmarks.si.molecular_symmetry` in the external research repository records six starts, the constrained
 symmetric stationary branch and its broken partners for a small H2 example.
 
 ## Single-reference MP2
@@ -215,8 +302,10 @@ evaluated. The zero-electron sector returns the exact bare-oscillator vacuum.
 
 ## LF-MR-NOCI
 
-`LFMR(model, lam, shift=None, *, character=None, overlap_cut=1e-10,
-condition_limit=1e8)`:
+`LFMR(model, lam, shift=None, *, character=None, symmetry=None, irrep=None,
+row=0, determinants=None, overlap_cut=1e-10, condition_limit=1e8)`:
+
+For lattice models:
 
 - Inputs: `lam=(K,L,L)` indexed `[frame,mode,site]`, `shift=(K,L)`.
   Omitted shift is zero. All site determinants are retained initially.
@@ -233,6 +322,131 @@ condition_limit=1e8)`:
   it does not change retained rank. Projected calculation uses the same
   solver policy. `converged` requires norm error < `1e-9` and retained
   residual < `1e-10`.
+
+For `ElectronPhononModel`, `MolecularEP` and `MolecularPF`:
+
+- Frames are finite `float64 (F,nmode,norb)` and shifts `(F,nmode)`;
+  omitted shifts are zero. `character` is unavailable and cannot be combined
+  with `symmetry` on any model.
+- `symmetry=None, irrep=None` retains unprojected frames. Otherwise supply
+  a validated `JointSymmetry` and one of its exact irrep labels.
+- Projection fixes integer partner `row` in `[0,d)` and retains all `d`
+  irrep columns. Coefficients are `complex128 (F,d,nstra,nstrb)` or,
+  with a selected list, `(F,d,D)`. Unprojected coefficients have shape
+  `(F,nstra,nstrb)` or `(F,D)`. No full group-orbit matrix is allocated.
+- `determinants` has the explicit bit-pair contract below. Under projection
+  it must span a closed electronic representation; leakage is rejected.
+- Dense limits are 256 determinants and 1024 projected pool coordinates.
+- Canonical metric selection uses `s > overlap_cut*max(1,s_max)` and complex
+  conjugate transposes. The result includes `basis_shape`, norm error,
+  retained-space residual, overlap eigenvalues/threshold, energy spectrum,
+  and (when projected) group/irrep/row/partner metadata. Convergence requires
+  norm error and retained residual below `1e-10`.
+- Near-dependent canonical columns trigger extended reduced H/S
+  accumulation; the actual retained metric is solved explicitly. Norms and
+  retained residuals also use extended accumulation on saved coefficients.
+  Raw kernels and public coefficients remain float64/complex128.
+- `symmetry_diagnostics()` optionally contracts analytic group expectations,
+  central-projector purity and the expected fixed-row law `D[row,row](g)`.
+  A non-Abelian partner is not individually invariant under every operation.
+  These checks introduce no photon cutoff. Cost can be significant for
+  large groups; see the function docstring.
+- `site_density()` remains a lattice observable. Molecular projected RDMs
+  are not yet implemented. Molecular MRPT2 is also outside this extension.
+
+### Fixed-pool LF reference selection
+
+`select_lf_references(model, lam, shift=None, *, symmetry=None, irrep=None,
+determinants=None, strategy="greedy", energy_tol=1e-8, overlap_cut=1e-10,
+max_references=None)` holds the supplied candidate frames fixed. Strategies
+are `"unprojected"` (single-frame unprojected CI ranking), `"projected"`
+(target-sector single-frame ranking), and `"greedy"` (largest actual
+target-sector MR lowering). All accumulated solves use the same target
+sector. The entire pool must satisfy the dense limits before selection.
+
+New candidate columns are residualized in the physical Gram metric;
+directions below `overlap_cut*max(1,s_max(candidate))` are discarded, while
+all previously retained columns remain unchanged. Duplicate subspaces and
+zero projectors are skipped. Stop before a gain smaller than `energy_tol`,
+when no new direction remains, or at `max_references`. Input index breaks
+ties. Zero `energy_tol` admits zero-gain independent directions.
+
+The returned dictionary contains `chosen_indices`, single-frame and ranking
+energies, accepted `history`, `energies`, `ranks`, `gains`, norm errors and
+retained residuals, `stop_reason`, final `energy`, full-pool structured
+`coeff`, and retained basis `Q`. An all-zero pool returns `energy=None`
+and rank zero. No frame optimization or new candidate generation occurs
+inside this function. `benchmarks.si.molecular_lfmr` in the external research repository supplies the documented
+multistart LFHF plus local-trial pool and saves the complete experiment.
+
+For the saved selection coefficients,
+`mr_lf.mr.group_diagnostics.lf_group_state_diagnostics(model, lam, coeff,
+shift=None, *, symmetry, irrep, row=0, determinants=None)` performs the
+same analytic checks as `LFMR.symmetry_diagnostics()` directly from arrays.
+Use the full supplied pool and its structured `coeff`; no second MR solve
+or fresh overlap truncation is needed. Coefficients must be float64 or
+complex128 with the exact projected shape. The norm-consistency check
+assumes a normalized physical state.
+
+### General-integral vacuum MR with selected determinants
+
+The low-level `mr_lf.mr.general_kernels.lf_vacuum_frame_blocks(model, lam,
+shift=None, *, determinants=None)` accepts `ElectronPhononModel` and
+`MolecularEP`. It holds the supplied LF frames fixed and returns a dictionary
+with `smat` and `hmat` for `mr_lf.mr.noci.lf_noci_lowest(**blocks)`.
+
+- `lam` is finite `float64 (F,nmode,norb)`, `F>=1`; `shift` is finite
+  `float64 (F,nmode)`, defaulting to zero.
+- `determinants=None` retains complete FCI and six-axis output
+  `(F,nstra,nstrb,F,nstra,nstrb)` in `cistring` address order.
+- An explicit list is strict `int64 (D,2)`: alpha and beta **bit-string
+  values** in the model's common orthonormal orbital basis. Rows must be
+  unique, nonnegative, within `norb`, and have the prescribed spin electron
+  counts. Input order is preserved; all frames share the same list.
+- Explicit-list output is `float64 (F,D,F,D)`, indexed bra frame, bra
+  selected address, ket frame, ket selected address. NOCI returns coefficients
+  `(F,D)`; this second axis is a paired determinant address, not a site index.
+- At most 256 full or selected determinants and 1024 total frame basis
+  states are supported. Guards precede electronic transitions and dense
+  matrix allocations. The selected path never enumerates complete FCI,
+  expands the list to a spin-string Cartesian product, or allocates FCI CI
+  vectors. Full four-index integral storage is still required.
+- Electronic overlaps remain `delta_ij`. Scalar `ecore` is included once as
+  `ecore*S`; coupling is uncentered and there is no phonon zero-point constant.
+  Raw Hermitian errors above `1e-12*max(1,max(abs(matrix)))` or nonfinite
+  results raise; only accepted roundoff is averaged.
+
+For example, with a two-orbital `(1,1)` model, this list deliberately omits
+one member of the alpha/beta Cartesian product:
+
+```python
+import numpy as np
+from mr_lf.mr.general_kernels import lf_vacuum_frame_blocks
+from mr_lf.mr.noci import lf_noci_lowest
+
+determinants = np.array([[1, 1], [2, 2], [1, 2]], dtype=np.int64)
+lam = np.zeros((2, model.nmode, model.norb), dtype=np.float64)
+blocks = lf_vacuum_frame_blocks(model, lam, determinants=determinants)
+energy, coeff, rank = lf_noci_lowest(**blocks)
+assert coeff.shape == (2, 3)
+```
+
+The internal `mr_lf._selected_electronic.SelectedElectronicSpace(model,
+determinants)` provides `density: float64 (D,norb)`, `apply(ci)` and
+`apply_one(operator,ci)` for finite `float64 (D,)` vectors. One-body
+operators are finite `float64 (norb,norb)` and may be nonsymmetric.
+`dense(limit=256)` returns electronic `(D,D)` and coupling `(nmode,D,D)`
+matrices without `ecore`; `apply` does not build these matrices. Determinant
+inputs are copied and read-only/strided inputs are supported. Recreate the
+space if model integrals change.
+
+`LFMR` now exposes this same determinant interface, including optional
+point-group projection; `LFMRPT2` remains lattice-only. No automatic
+determinant selection, electronic external-space PT2, phonon excitations, or independent
+frame orbital sets are implemented. Selection is basis-dependent: a single HF
+determinant in its optimized MO basis generally expands into multiple
+determinants in the fixed Löwdin basis. Removing configurations is a
+variational truncation, not an orbital rotation or an orbital-space reduction.
 
 ## LF-MRPT2
 
@@ -287,6 +501,18 @@ the Gram matrices per electronic group; `external_scale` carries the
 largest external Gram eigenvalue of the omitted parity sector
 (`external_gram_maximum`) so the cut threshold equals the complete list's.
 `mrpt2_from_blocks` also accepts explicit `reference_groups`/`external_groups`.
+
+This interface is lattice-only. Inputs `lam/shift` retain float64 shapes
+`(F,L,L)`/`(F,L)`; external configurations are unique int64 `(K,L)` rows
+closed under translation. `character` is an integer +1, or -1 for even L;
+`parity` is None or an integer +/-1 and requires equal spin counts.
+Invalid types, duplicate/nonclosed lists and inconsistent flags are rejected
+before electronic enumeration. Cutoffs must be finite and positive, and the
+omitted-sector scale must be finite and nonnegative. The derivation is in
+[Theory section 15](theory.md#15-translation-and-spin-exchange-reduction-of-lattice-mrpt2).
+The convergence and plotting drivers are external research workflows
+`benchmarks.si.mrpt2_m_convergence` and
+`benchmarks.si.plot_mrpt2_convergence`, not library dependencies.
 
 ## Low-level access and failure behavior
 

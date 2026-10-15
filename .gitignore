@@ -5,3 +5,5 @@ build/
 dist/
 outputs/
 .venv/
+.pytest_cache/
+.ruff_cache/

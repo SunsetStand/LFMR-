@@ -54,8 +54,9 @@ different indices. The combined determinant address is
 $I_{\rm addr}=I_{\alpha,\rm addr}d_\beta+I_{\beta,\rm addr}$.
 Occupied MO columns precede virtual columns; no MO index is a site address.
 
-`float64` is used for physical kernels and state coefficients; configuration
-lists and group labels use `int64`. Array orders are:
+`float64` is used for the existing energy kernels and state coefficients;
+the electronic symmetry utility in Section 13 also accepts `complex128` CI.
+Configuration lists and group labels use `int64`. Array orders are:
 
 | Quantity | Shape and order |
 |---|---|
@@ -148,10 +149,10 @@ $g^x_{pq}=g\delta_{xp}\delta_{pq}$. The two opposite-spin terms, together
 with the factor $1/2$, give $U n_{p\alpha}n_{p\beta}$; same-spin terms
 vanish. This recovers the Hamiltonian above without an energy shift.
 
-The general integral paths now support ED and a limited LF-HF/MP2
-calculation. The lattice formulas in the remainder of this document keep
-their original specialization. General MR/PT2, molecular symmetry restoration,
-Hessians and reference-selection studies are subsequent work.
+The general integral paths support ED, LF-HF/MP2 and fixed-frame LFMR.
+Sections 13-14 extend these to molecular cavities, joint symmetry restoration
+and fixed-pool reference selection. The lattice formulas retain their
+original specialization. Molecular MRPT2, Hessians and VAP are not implemented.
 
 ### General-integral ED and density-diagonal LF reference
 
@@ -389,6 +390,65 @@ Site occupations and double occupancies are obtained from bit strings.
 Conditional displacement products are evaluated by NumPy contractions.
 These vacuum kernels are analytic in the complete phonon space and use no
 ED oscillator cutoff.
+
+### General-integral vacuum frames with an explicit CI list
+
+For an ordered list of paired alpha/beta bit strings
+$\mathcal D=\{(s_i^\alpha,s_i^\beta)\}_{i=0}^{D-1}$ in the same orthonormal
+orbital basis, define $P_\mathcal D=\sum_{i\in\mathcal D}|i\rangle\langle i|$.
+Different selected determinants have electronic overlap $\delta_{ij}$;
+the list need not be a Cartesian product of spin-string lists. The selected
+operators are $P_\mathcal D H_{\rm el}P_\mathcal D$ and
+$P_\mathcal D G^xP_\mathcal D$, with $H_{\rm el}$ excluding `ecore`.
+
+To retain the general chemists' ERI tensor without additional permutations,
+write $E_{pq}=\sum_\sigma a^\dagger_{p\sigma}a_{q\sigma}$. Normal ordering gives
+
+$$
+\sum_{\sigma\tau}a^\dagger_{p\sigma}a^\dagger_{r\tau}
+a_{s\tau}a_{q\sigma}=E_{pq}E_{rs}-\delta_{qr}E_{ps},
+$$
+$$
+H_{\rm el}=\sum_{ps}\left(h_{ps}-\frac12\sum_q v_{pqqs}\right)E_{ps}
++\frac12\sum_{pqrs}v_{pqrs}E_{pq}E_{rs}.
+$$
+
+`SelectedElectronicSpace` applies this expression directly to each selected
+ket. Allowed one-body actions use `cistring.cre_des_sign`, with occupation
+checks before calling it; for $p=q$ the orbital must be occupied. Each spin
+sector's one-body action preserves that spin's electron count, and its even
+fermion parity introduces no additional sign from the other spin sector.
+Only the final bra is looked up in the selected list. The intermediate state
+between the two $E$ operators is unrestricted, because
+$P E_{pq}E_{rs}P$ is generally different from $P E_{pq}P E_{rs}P$.
+Contributions are streamed rather than storing full-space transition tables;
+the dense selected matrices use the same contribution generators.
+
+Each supplied LF frame has $|A,i\rangle=|i\rangle D(\eta_{Ai})|0\rangle$,
+where $\eta_{Ai,x}=z_{A,x}-\sum_p\lambda_{A,xp}n_p(i)$ and
+$f_{Ai,Bj}=\exp[-\|\eta_{Bj}-\eta_{Ai}\|^2/2]$. The general vacuum kernels are
+
+$$
+S_{Ai,Bj}=\delta_{ij}f_{Ai,Bj},\qquad
+H_{Ai,Bj}=f_{Ai,Bj}\left[
+h^{\rm el}_{ij}+\sum_x G^x_{ij}(\eta_{Ai,x}+\eta_{Bj,x})
++\delta_{ij}\left(E_{\rm core}+\sum_x\omega_x\eta_{Ai,x}\eta_{Bj,x}\right)
+\right].
+$$
+
+This is a variational electronic truncation at fixed frames, with no PT2
+correction for excluded configurations. A nested-list variational comparison
+requires consistent retained physical spans: an overlap threshold can itself
+remove directions. The small-space implementation keeps full ERI storage,
+limits the selected list to 256 determinants and the total frame basis to
+1024, and outputs `(F,D,F,D)` tensors. With no explicit list, the existing
+six-axis complete-FCI representation is retained.
+
+See the [PySCF selected-CI operator identity](https://pyscf.org/_modules/pyscf/fci/selected_ci.html)
+and [cistring signs](https://pyscf.org/_modules/pyscf/fci/cistring.html).
+The PySCF fast selected-CI contraction uses spin-string Cartesian-product
+vectors and fourfold ERI packing; the general paired-list contraction here
+retains the full ordered integral tensor instead.
 
 ## 4. NOCI coefficients and overlap truncation
 
@@ -875,7 +935,295 @@ by $N_e$. Existing zero-shift LF scans are unchanged by this correction.
 | Assembly-to-solver interface | `mr.pt2.mrpt2_from_blocks` |
 | Density in the nonorthogonal metric | `observables.noci_site_density` |
 | Multi-electron CS reference and channels | `scf.cs.cs_hf_multi_optimize`, `mp.cs.cs_mp2_unrestricted_reference_point` |
+| Active electronic CI rotation and molecular basis actions | `point_group.apply_electronic_symmetry`, `molecular_point_group` |
+| Dipole-derived Pauli-Fierz integrals with DSE | `molecular.MolecularPF` |
 
 See [API.md](API.md) for constructor arguments and result fields, and the
 [reference-data guide](../reference_data/README.md) for the numerical
 provenance and the exact frame recipes used in the bundled figures.
+
+## 13. Molecular electronic symmetry and the cavity-integral extension
+
+The implemented molecular extension has two independently tested parts:
+active electronic CI rotations and construction of Pauli-Fierz integral
+data. The full derivation, parameter choices, software responsibilities and
+runnable usage are in [Molecular symmetry and cavity guide](molecular_symmetry.md).
+Section 14 builds on these utilities to implement joint electron/photon
+symmetry projection and molecular LFMR reference selection.
+
+### Active rotations and determinant signs
+
+The active action is $R\phi_p=\sum_q\phi_qU_{qp}$. A nonorthogonal AO
+action preserves the AO metric, with orthonormal representation
+
+$$
+U_{AO}^T S U_{AO}=S,\qquad
+U_{orth}=(X^T S)U_{AO}X,\qquad X=S^{-1/2}.
+$$
+
+For ascending occupied-orbital lists within each spin sector,
+
+$$
+M_\sigma(U)[J,I]=\det U[J_{occ},I_{occ}],\qquad
+C'=M_\alpha(U)C M_\beta(U)^T.
+$$
+
+This includes fermionic reordering signs. PySCF's passive CI transformation
+therefore receives `U.T`; neither the complex CI coefficients nor their
+normalization are changed otherwise. MolSym supplies finite-group operations
+and irrep matrices, including complex characters and multidimensional irreps.
+PySCF supplies spherical-AO and CI rotations. Linear molecules require an
+explicit finite subgroup, such as D2h for H2.
+
+### Total dipole, nuclear constant, and DSE
+
+In the paper's electron-position-minus-nuclear-position convention, define
+
+$$
+\hat D_k=\sum_{pq\sigma}r^k_{pq}a^\dagger_{p\sigma}a_{q\sigma}
+-d^{nuc}_k\hat 1,\qquad d^{nuc}_k=\sum_A Z_A(R_{A,k}-o_k).
+$$
+
+At fixed $N_e>0$, the one-body matrix
+$\mu^k=r^k-d^{nuc}_k I/N_e$ represents this total operator exactly in that
+sector. The division by $N_e$ subtracts the nuclear constant once. The model
+must be rebuilt if its electron number changes. The default origin is the
+nuclear-charge center; explicit origins are supplied in Bohr.
+
+For a unit polarization $e_x$, $\mu_x=e_x\cdot\boldsymbol\mu$ and
+
+$$
+g^x=-\sqrt{\omega_x/2}\lambda_x\mu_x,\qquad
+\Delta h=\frac12\sum_x\lambda_x^2\mu_x\mu_x,\qquad
+\Delta V_{pqrs}=\sum_x\lambda_x^2\mu^x_{pq}\mu^x_{rs}.
+$$
+
+Normal ordering $\frac12\lambda_x^2\hat D_x^2$ produces the one-body
+matrix product and the two-body term with the Hamiltonian's existing 1/2
+prefactor. Products are formed in the fixed orthonormal basis. This is the
+projected-dipole-product DSE of Cui Eqs. (7)-(9); the finite-basis quadrupole
+correction in Eq. (10) is excluded. Nuclear dipole contributions are already
+encoded in $\mu$, so `ecore` remains nuclear repulsion alone. There is no
+photon zero-point constant and no lattice density-centering correction.
+
+The first cavity example uses H2/STO-3G, R=0.74 Angstrom, a z-polarized mode
+with $\omega=0.466751$ Ha and $\lambda_c=0.05$ or 0.5 au. Symmetric Lowdin
+retains all AOs; it differs from the paper's meta-Lowdin choice. No additional
+CCSD(T)-minus-MP2 electronic correction from the paper's Eq. (42) is added.
+The example reports one saved LF-HF initialization, independent ED residuals,
+and separate ED/MP2 photon-cutoff histories. Its convergence flags do not
+prove a global HF minimum or a general LFMR reference-selection result.
+
+## 14. Joint molecular cavity projection and fixed-pool LFMR
+
+This extension supersedes the earlier implementation boundary stated in
+Section 13. Joint electronic/photon representations, coherent LFMR
+projection, optional analytic symmetry diagnostics and fixed-pool reference
+selection are now implemented. The extended derivation and usage are in
+[the molecular guide](molecular_symmetry.md). Install the standalone SI
+package with `python -m pip install ".[symmetry]"` to obtain MolSym.
+
+### A symmetry acts on orbitals and photon modes
+
+Let $U_g$ be the active orthonormal-orbital action and $Q_g$ the active
+photon-mode action, so a coherent amplitude transforms as
+$\eta\mapsto Q_g\eta$. Orthogonal group representations preserve the
+Hamiltonian only if
+
+$$
+U_g h U_g^T=h,\quad U_g^{\otimes4}V=V,\quad
+Q_g\Omega=\Omega Q_g,\quad
+U_g g^xU_g^T=\sum_yQ_g[y,x]g^y,
+\qquad \Omega=\operatorname{diag}(\omega).
+$$
+
+`joint_symmetry` validates supplied representations against integral data.
+For `MolecularPF`, `molecular_cavity_symmetry` starts with the bare
+molecular finite group and filters to operations preserving its cavity.
+Within each frequency block, use columns $A_x=\lambda_x e_x$. If
+$O_gAA^TO_g^T=AA^T$, then
+
+$$
+Q_g=A^+O_gA+I-A^+A.
+$$
+
+The final term gives identity on uncoupled mode combinations. This admits
+mixing of degenerate modes, rather than requiring each polarization to be
+separately fixed. Actual integral covariance is checked after this
+geometric criterion. The surviving operations must be closed; MolSym
+supplies the subgroup label, canonical order and irreps. A charged
+system with a custom dipole origin can require photon translations,
+which are outside the current orthogonal action and can reduce the
+accepted subgroup. Neutral common-origin shifts cancel in the total dipole.
+
+### Relative kernels avoid rotating diagonal LF parameters
+
+In the fixed Lowdin basis, a frame contains conditional displacements
+
+$$
+|A,I\rangle=|I\rangle|\eta_{AI}\rangle,\qquad
+\eta_{AI,x}=z_{A,x}-\sum_p\lambda_{A,xp}n_p(I).
+$$
+
+An orbital mixture need not produce another density-diagonal LF frame.
+Instead evaluate $K^{S/H}_{AI,BJ}(g)=\langle AI|1/H\,R(g)|BJ\rangle$.
+With $a=\eta_{AI}$, $b=Q_g\eta_{BJ}$ and determinant action $T_g$,
+
+$$
+K^S(g)=e^{-\|a-b\|^2/2}(T_g)_{IJ},
+$$
+
+$$
+K^H(g)=e^{-\|a-b\|^2/2}\left[
+(H_{el}T_g)_{IJ}+\sum_x(a_x+b_x)(G_xT_g)_{IJ}
++\left(E_{core}+\sum_x\omega_xa_xb_x\right)(T_g)_{IJ}\right].
+$$
+
+$H_{el}$ contains h and V but excludes $E_{core}$. These formulas follow
+from coherent overlap, linear-coordinate and number-operator matrix
+elements; they use the full oscillator space. Relative kernels are
+streamed one operation at a time and are not individually Hermitian.
+
+For a d-dimensional irrep, use matrix-unit projectors
+
+$$
+P^\Gamma_{mn}=\frac{d}{|G|}\sum_gD^\Gamma_{mn}(g)^*R(g),\qquad
+P_{mn}P_{kl}=\delta_{nk}P_{ml},\quad P_{mn}^\dagger=P_{nm}.
+$$
+
+Fix a partner row m and retain all columns n. The projected basis is
+$P_{mn}|AI\rangle$, and its two-sided Hamiltonian matrix is
+
+$$
+H_{AnI,BkJ}=\langle AI|P_{nm}H P_{mk}|BJ\rangle
+=\frac{d}{|G|}\sum_gD^\Gamma_{nk}(g)^*K^H_{AI,BJ}(g).
+$$
+
+The overlap has the identical reduction. H/S are independent of m; the
+reconstructed partner state depends on m. `LFMR(model, lam, shift,
+symmetry=group, irrep=label, row=0, determinants=None)` performs the
+complex Hermitian NOCI solve with full coefficient shape
+`(F,d,nstra,nstrb)`. Selected determinants instead give `(F,d,D)` and
+must form a subspace closed under electronic group actions. Selected
+rows contain alpha/beta bit integers; full CI axes contain determinant
+addresses. Exact MolSym labels are required, e.g. `A_1g` for D2h and
+`A_1'` for D3h. The real lattice `character` path remains available and
+cannot be combined with molecular symmetry.
+
+The current dense guards are $D\le256$ and $FdD\le1024$. Flattening is
+confined to the solve boundary and conjugate transposes replace real
+transposes. Null metric directions are removed before the eigenproblem;
+the reported projected residual applies to that retained variational
+space, not the full physical Hilbert space. Frames are fixed: there is
+no variation after projection, spin projection or molecular MRPT2.
+
+### Partner transformation, purity and reference choice
+
+For a normalized fixed-row state, the actual group expectation is
+$r_g=\langle\Psi_m|R(g)|\Psi_m\rangle=D^\Gamma_{mm}(g)$. Thus
+
+$$
+p_\Gamma=\frac{d}{|G|}\sum_g\chi_\Gamma(g)^*r_g=1.
+$$
+
+The optional `symmetry_diagnostics()` contracts the state with analytic
+relative overlap kernels to measure these expectations, central
+representation purity and norm consistency. Only the totally symmetric
+one-dimensional irrep is individually invariant under every operation.
+Non-Abelian partner rows generally mix under the group.
+
+`select_lf_references` compares a fixed pool with `unprojected`,
+`projected` and `greedy` strategies. The first two rank single-frame CI
+energies before or after projection; the third evaluates actual MR
+lowering. Every accepted sequence uses the same target sector. Candidate
+columns C are residualized against retained columns B in the physical
+Gram metric,
+
+$$
+C_\perp=C-B(B^\dagger S B)^{-1}B^\dagger SC.
+$$
+
+Only new residual directions are thresholded, using the fixed scale of
+their original candidate block. Old directions are retained unchanged,
+so accepted spaces are nested. Duplicate/zero projected spaces add no
+direction. The default stopping gain is $10^{-8}$ Ha after the first
+accepted frame. This is fixed-pool selection, not reference optimization;
+the entire pool must fit the dense guards before selection begins.
+
+Initial method-test parameters are H2/STO-3G at R=0.74, 1.5 and 2.0
+Angstrom with one bond-polarized mode, $\omega=0.466751$ Ha; and
+equilateral H3+/STO-3G at side lengths 0.9 and 1.5 Angstrom with two
+equal in-plane modes, $\omega=0.5$ Ha. Cavity strengths are
+$\lambda_c=0,0.05,0.5$ au. The runnable `benchmarks/si/molecular_lfmr.py` in the research repository
+CLI exposes `--molecule h2/h3`, `--distance`, `--lambda-c`,
+`--output`, `--ed-cutoffs`, and `--suite` for all 15 combinations. The
+[molecular guide](molecular_symmetry.md#10-initial-calculations-and-independent-acceptance)
+specifies the three HF initial guesses, trial perturbations, solver settings
+and saved files. Coherent LFMR and photon-truncated ED require separate
+error checks. A total-photon-number cutoff preserves degenerate-mode
+rotation symmetry, whereas a rectangular per-mode cutoff generally does
+not. ED residuals, cutoff convergence, metric stability and irrep purity
+must be recorded separately.
+
+For nearly dependent retained columns, reduced H/S products use extended
+accumulation when column magnitudes exceed 100, then LAPACK solves the
+actual reduced generalized eigenproblem in complex128. Retained residuals
+and norms use extended accumulation on the saved coefficient vector.
+This does not regenerate more accurate raw kernels or alter rank cutoffs.
+
+The first 15-point study has passed the recorded numerical checks. Its
+parameters, candidate provenance and representative strategy comparisons
+are documented in [the molecular guide](molecular_symmetry.md#recorded-first-study).
+This validates the implementation at those small-basis points; the
+remaining strong-coupling H3+ variational error is not a solver residual.
+
+## 15. Translation and spin-exchange reduction of lattice MRPT2
+
+The merged `mr_lf.mr.reduced` implements an alternative storage path for
+the lattice block-Hamiltonian partition. It does not implement molecular
+MRPT2. External configurations must be unique int64 rows and closed under
+lattice translation; supplying a nonclosed list is rejected.
+
+Let B contain the complete projected external candidates. If a seed is
+exactly translation invariant, several columns differ only by a sign.
+Replacing each orbit of k equivalent columns by one representative weighted
+by sqrt(k) preserves the candidate operator:
+
+$$
+B B^\dagger=B_{red}B_{red}^\dagger.
+$$
+
+Thus this removal of exact redundancy preserves all nonzero Gram
+eigenvalues as well as the represented space. A finite external eigenvalue
+cutoff therefore keeps the same threshold and physical directions.
+
+For equal spin counts the exchange operator obeys
+
+$$
+F|I_\alpha,I_\beta\rangle
+=(-1)^{N_\alpha N_\beta}|I_\beta,I_\alpha\rangle,
+\qquad F^2=1.
+$$
+
+Density-dependent LF frames and the lattice Hamiltonian commute with F.
+Only the external parity sector matching the reference root couples to
+that root. When removing the other sector, the cutoff still uses the
+largest reference-subtracted Gram eigenvalue from both sectors:
+
+$$
+\tau_T=\epsilon_T\max(1,s_{max}^{+},s_{max}^{-}).
+$$
+
+`external_gram_maximum` supplies the omitted-sector scale. Reference
+directions stay complete. Electronic-orbit groups give block-diagonal
+overlap storage; Hamiltonian couplings between groups are all retained.
+`defer_h=True` builds each Hamiltonian group pair only when it is contracted.
+`lean_mrpt2` uses float64, checks reference gaps and positive denominators,
+and returns residual and metric diagnostics. The external workflow applies
+the same numerical acceptance thresholds as `LFMRPT2`.
+
+Independent tests in the research repository compare raw reduced blocks
+with complete-list congruences, and compare full/reduced/lean response
+energies on small cutoffs. This integration does not certify a new full
+high-cutoff alpha scan or its convergence. The resumable convergence and
+plot drivers live under `benchmarks/si/` in the research repository.
