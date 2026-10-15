@@ -214,6 +214,21 @@ python -m examples.multi_electron_scan --full --with-mrpt2 --max-total 5 --preci
 python -m examples.mrpt2_cutoff --case multi --omega 0.5 --alpha 0.8 --max-total 3 --precision-mode reconditioned_longdouble
 ```
 
+To raise the MRPT2 cutoff at one archived point until two successive
+increments `|E(M)-E(M-1)|` fall below `1e-6` (both external cuts), and to
+redraw the converged scans:
+
+```bash
+python -m examples.mrpt2_m_convergence --case multi --omega 0.5 --alpha 2.4 --algorithm lean --output runs/multi/w0.5_a2.4.csv
+python -m examples.plot_mrpt2_convergence --runs runs
+```
+
+`--algorithm lean` uses `mr_lf.mr.reduced`: exact translation-orbit
+reduction of invariant seeds, the spin-exchange sector of the MR root, and
+group-blocked overlap storage (`--defer-h` also contracts H_TT one group
+pair at a time). It reproduces `LFMRPT2` energies to roundoff while using
+several times less memory; reruns resume from the CSV.
+
 Scan calculations optimize their own references and record method failures;
 they need not reproduce the last digits of archived local minima. To
 recompute MR/PT2 using the exact archived frames, use:

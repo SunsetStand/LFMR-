@@ -243,12 +243,17 @@ def mrpt2_from_blocks(
     return_hamiltonian_blocks=False,
     precision_mode="float64",
     projected=True,
+    reference_groups=None,
+    external_groups=None,
 ):
     """Connect six blocks to retained-space geometry and the PT2 solver.
 
     projected=True groups determinants by translation orbit; False groups
     by determinant address. Both partitions use the same retained-space
     geometry, response equation and optional precision reconditioning.
+    Explicit int64 reference_groups (nr,) and external_groups (nt,) replace
+    that default labelling, for candidate lists other than the complete
+    seed/determinant/configuration product (nconfig is then not used).
 
     blocks is a dictionary of finite float64 S/H arrays: rr (nr,nr),
     rt (nr,nt), tt (nt,nt). nseed is a positive integer, 0 < nsite < 64,
@@ -324,14 +329,19 @@ def mrpt2_from_blocks(
         raise ValueError("blocks must contain all six overlap/Hamiltonian blocks")
     if not isinstance(projected, (bool, np.bool_)):
         raise TypeError("projected must be bool")
-    if projected:
-        _, _, groups = _translation_electron_labels(nsite, nelec)
-    else:
-        import math
+    if (reference_groups is None) != (external_groups is None):
+        raise ValueError("supply both reference_groups and external_groups, or neither")
+    if reference_groups is None:
+        if projected:
+            _, _, groups = _translation_electron_labels(nsite, nelec)
+        else:
+            import math
 
-        groups = np.arange(math.comb(nsite, nelec[0]) * math.comb(nsite, nelec[1]), dtype=np.int64)
-    reference_groups = np.tile(groups, nseed)
-    external_groups = np.repeat(reference_groups, nconfig)
+            groups = np.arange(
+                math.comb(nsite, nelec[0]) * math.comb(nsite, nelec[1]), dtype=np.int64
+            )
+        reference_groups = np.tile(groups, nseed)
+        external_groups = np.repeat(reference_groups, nconfig)
     geometry = orthogonalize_mr_spaces_blockwise(
         blocks["s_rr"],
         blocks["s_rt"],

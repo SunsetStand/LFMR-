@@ -272,6 +272,22 @@ Both raw kernels and final solver arrays remain `float64`.
 `converged` means numerical validity at this supplied cutoff; `cutoff_converged`
 is false. Nonvariational corrected energies can lie below ED.
 
+### Symmetry-reduced high-cutoff MRPT2
+
+`mr_lf.mr.reduced.build_reduced_projected_blocks(model, lam, shift,
+occupations, *, character, parity=None, grouped_overlap=False,
+defer_h=False)` builds projected candidate blocks for a reduced list:
+columns of exactly translation-invariant seeds are replaced by one
+`sqrt(orbit size)`-weighted column per (determinant, configuration) orbit,
+and other seeds by spin-exchange-adapted pairs of the MR root's parity
+(`reference_spin_parity(mr)`). References stay complete. `lean_mrpt2(blocks,
+info, *, reference_cut, external_cut, external_scale)` applies the same cut
+rules and acceptance checks as `mrpt2_from_blocks` (float64 only), storing
+the Gram matrices per electronic group; `external_scale` carries the
+largest external Gram eigenvalue of the omitted parity sector
+(`external_gram_maximum`) so the cut threshold equals the complete list's.
+`mrpt2_from_blocks` also accepts explicit `reference_groups`/`external_groups`.
+
 ## Low-level access and failure behavior
 
 Examples:
