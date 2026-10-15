@@ -15,6 +15,7 @@ dependencies = ["numpy==2.5.3", "scipy==1.18.1", "pyscf==2.14.0"]
 
 [project.optional-dependencies]
 plot = ["matplotlib==3.11.1"]
+symmetry = ["MolSym==1.2.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]

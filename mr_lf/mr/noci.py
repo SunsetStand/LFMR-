@@ -731,14 +731,39 @@ def _lf_relative_translation_kernels(
 class LFMR(Calculation):
     """Full electronic CI per supplied LF frame; fixed frame parameters.
 
-    character=None: unprojected frames. +1/-1: seeds projected to q=0/pi.
+    Molecular/integral models use optional joint symmetry and irrep labels.
+    Lattice character=None: unprojected frames; +1/-1: q=0/pi projection.
     kernel() varies only CI coefficients and returns the lowest MR energy.
     """
 
     def __init__(
-        self, model, lam, shift=None, *, character=None, overlap_cut=1e-10, condition_limit=1e8
+        self, model, lam, shift=None, *, character=None, symmetry=None, irrep=None,
+        row=0, determinants=None, overlap_cut=1e-10, condition_limit=1e8
     ):
         super().__init__(model)
+        from ..model import ElectronPhononModel
+
+        self.symmetry, self.irrep, self.row = symmetry, irrep, row
+        self.determinants = None if determinants is None else np.asarray(determinants).copy()
+        self._integral_model = isinstance(model, ElectronPhononModel)
+        if character is not None and symmetry is not None:
+            raise ValueError("character and symmetry cannot be specified together")
+        if self._integral_model:
+            from .general_kernels import _validate_inputs
+
+            if character is not None:
+                raise ValueError("character is a lattice-only translation projection")
+            if (symmetry is None) != (irrep is None):
+                raise ValueError("symmetry and irrep must be specified together")
+            if symmetry is None and row != 0:
+                raise ValueError("row is available only with a point-group projection")
+            shift = _validate_inputs(model, lam, shift, determinants)
+            self.lam, self.shift = lam.copy(), shift.copy()
+            self.character, self.overlap_cut = None, overlap_cut
+            self.condition_limit = condition_limit
+            return
+        if symmetry is not None or irrep is not None or determinants is not None or row != 0:
+            raise ValueError("molecular symmetry/determinants require an integral model")
         self.lam = np.asarray(lam).copy()
         if shift is None:
             shift = np.zeros((len(self.lam), model.L), dtype=np.float64)
@@ -758,6 +783,32 @@ class LFMR(Calculation):
     def kernel(self):
         self._reset()
         m = self.model
+        if self._integral_model:
+            from .general_kernels import lf_vacuum_frame_blocks
+            from .hermitian import hermitian_noci_result
+
+            if self.symmetry is None:
+                blocks = lf_vacuum_frame_blocks(
+                    m, self.lam, self.shift, determinants=self.determinants)
+                h, s = blocks["hmat"], blocks["smat"]
+            else:
+                from .point_group_kernels import lf_group_frame_blocks
+
+                h, s = lf_group_frame_blocks(
+                    m, self.lam, self.shift, symmetry=self.symmetry, irrep=self.irrep,
+                    row=self.row, determinants=self.determinants)
+            result = hermitian_noci_result(
+                h, s, overlap_cut=self.overlap_cut, condition_limit=self.condition_limit)
+            result.update(lam=self.lam.copy(), shift=self.shift.copy(), irrep=self.irrep,
+                          row=self.row, determinants=(None if self.determinants is None
+                                                    else self.determinants.copy()))
+            if self.symmetry is not None:
+                d = self.symmetry.group.irrep_matrices[self.irrep].shape[-1]
+                result.update(group=self.symmetry.group.name, irrep_dimension=d,
+                              partner_rows=tuple(range(d)),
+                              partner_convention="same CI coefficients, P[row,n] for each row")
+            ok = result["norm_error"] < 1e-10 and result["residual_projected"] < 1e-10
+            return self._finish(result, result["energy"], ok)
         if self.character is None:
             h = lf_multi_frame_hamiltonian(m.tmat, m.U, m.g, m.omega, self.lam, self.shift, m.nelec)
             s = lf_multi_frame_overlap(self.lam, self.shift, m.nelec)
@@ -809,6 +860,9 @@ class LFMR(Calculation):
 
     def site_density(self):
         require_reference(self)
+        if self._integral_model:
+            raise NotImplementedError(
+                "site_density is a lattice observable; molecular projected RDMs are not implemented")
         from ..observables import noci_site_density
 
         r = self.result
@@ -816,3 +870,9 @@ class LFMR(Calculation):
         # expanded-orbit Hamiltonian is constructed here.
         s = lf_multi_frame_overlap(r["lam"], r["shift"], self.model.nelec)
         return noci_site_density(r["expanded_coeff"], s, self.model.L, self.model.nelec)
+
+    def symmetry_diagnostics(self):
+        """Contract analytic group expectations and fixed-row irrep purity."""
+        from .group_diagnostics import lfmr_symmetry_diagnostics
+
+        return lfmr_symmetry_diagnostics(self)

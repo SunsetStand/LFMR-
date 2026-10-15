@@ -55,8 +55,8 @@ class ElectronPhononModel:
     omega: (nmode,); coupling: (nmode,norb,norb).
     All arrays are owned C-order float64 copies. norb and nmode are
     independent; nmode=0 uses omega.shape=(0,) and coupling.shape=(0,norb,norb).
-    nelec is an explicit (N_alpha,N_beta) tuple. This integral interface is
-    not yet accepted by the Hubbard–Holstein calculation drivers.
+    nelec is an explicit (N_alpha,N_beta) tuple. ExactED, LFHF, LFMP2 and
+    fixed-frame LFMR accept this integral interface.
     """
 
     h1e: np.ndarray
