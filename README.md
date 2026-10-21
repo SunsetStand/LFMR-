@@ -228,6 +228,8 @@ reduction of invariant seeds, the spin-exchange sector of the MR root, and
 group-blocked overlap storage (`--defer-h` also contracts H_TT one group
 pair at a time). It reproduces `LFMRPT2` energies to roundoff while using
 several times less memory; reruns resume from the CSV.
+The converged four-site scans (data, figures and provenance) are in
+[results/mrpt2_phonon_cutoff_convergence](results/mrpt2_phonon_cutoff_convergence/README.md).
 
 Scan calculations optimize their own references and record method failures;
 they need not reproduce the last digits of archived local minima. To
