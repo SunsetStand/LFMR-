@@ -1,0 +1,23 @@
+case,omega,alpha,ed_energy,mr_energy,mrpt2_cut8_energy,mrpt2_cut8_max_total,mrpt2_cut8_converged_M,mrpt2_cut8_converged,mrpt2_cut8_status,mrpt2_cut8_algorithm,mrpt2_cut8_precision_mode,mrpt2_cut8_external_rank,mrpt2_cut8_failure,mrpt2_cut10_energy,mrpt2_cut10_max_total,mrpt2_cut10_converged_M,mrpt2_cut10_converged,mrpt2_cut10_status,mrpt2_cut10_algorithm,mrpt2_cut10_precision_mode,mrpt2_cut10_external_rank,mrpt2_cut10_failure
+multi,0.5,0.0,-2.102748483462074,-2.102748483462075,-2.1027484834620727,3,3,True,ok,full,float64,308,,-2.1027484834620727,3,3,True,ok,full,float64,308,
+multi,0.5,0.4,-3.722234679001327,-3.7219187017271804,-3.722221747757656,4,4,True,ok,full,float64,1032,,-3.722221747757656,4,4,True,ok,full,float64,1032,
+multi,0.5,0.8,-5.343456394868242,-5.342037921823664,-5.343327082071986,6,6,True,ok,full,float64,2938,,nan,6,,False,failed,full,float64,,h_external congruence asymmetry exceeds roundoff bound: 1.9397366626148447e-06
+multi,0.5,1.2,-6.9669593173568165,-6.9632360475059345,-6.966406305075135,6,6,True,ok,full,float64,2956,,nan,6,,False,failed,full,float64,,h_external congruence asymmetry exceeds roundoff bound: 1.1471836156393025e-06
+multi,0.5,1.6,-8.593747158530604,-8.585678806123038,-8.59199765375545,8,8,True,ok,full,float64,6775,,nan,8,,False,failed,full,float64,,h_external congruence asymmetry exceeds roundoff bound: 7.526394134857699e-07
+multi,0.5,2.0,-10.226492861192469,-10.209584575173741,-10.2212700571199,14,14,True,ok,lean,float64,34772,,nan,13,,False,failed,lean,float64,,h_external congruence asymmetry exceeds roundoff bound: 1.2231769735970845e-06
+multi,0.5,2.4,-12.65804240968778,-12.644287477340555,-12.657120302728678,13,13,True,ok,lean,float64,46124,,nan,13,,False,failed,lean,float64,,MRPT2 numerical residual or metric check failed
+multi,0.5,2.8,-15.532140759146177,-15.527651753489522,-15.532027948214733,9,9,True,ok,lean,float64,13972,,-15.532027948214733,9,9,True,ok,lean,float64,13972,
+multi,0.5,3.2,-18.524825858605368,-18.522928029397434,-18.52480415542176,8,8,True,ok,full,float64,13380,,-18.52480415542176,8,8,True,ok,full,float64,13380,
+multi,0.5,3.6,-21.58142556320903,-21.580479071695052,-21.581419703497865,7,7,True,ok,full,float64,8910,,-21.581419703497865,7,7,True,ok,full,float64,8910,
+multi,0.5,4.0,-24.676379084041194,-24.675850078914294,-24.676377071022408,6,6,True,ok,full,float64,5670,,-24.676377071022408,6,6,True,ok,full,float64,5670,
+multi,5.0,0.0,-2.102748483462074,-2.102748483462075,-2.1027484834620727,3,3,True,ok,full,float64,308,,-2.1027484834620727,3,3,True,ok,full,float64,308,
+multi,5.0,0.4,-3.8208165388903703,-3.8203473558342913,-3.820805981817941,4,4,True,ok,full,float64,1033,,nan,4,,False,failed,full,float64,,MRPT2 numerical residual or metric check failed
+multi,5.0,0.8,-5.563903885022497,-5.561667914922791,-5.563802003243079,6,6,True,ok,full,float64,3048,,nan,6,,False,failed,full,float64,,MRPT2 numerical residual or metric check failed
+multi,5.0,1.2,-7.34254382001493,-7.336223734341351,-7.342112949157726,6,6,True,ok,full,float64,3199,,nan,6,,False,failed,full,float64,,MRPT2 numerical residual or metric check failed
+multi,5.0,1.6,-9.174936282997294,-9.15998940280542,-9.173544048806335,6,6,True,ok,full,float64,3210,,nan,6,,False,failed,full,float64,,MRPT2 numerical residual or metric check failed
+multi,5.0,2.0,-11.096623035077718,-11.070408665766939,-11.09380889284927,6,6,True,ok,full,float64,4799,,nan,6,,False,failed,full,float64,,MRPT2 numerical residual or metric check failed
+multi,5.0,2.4,-13.598069602279995,-13.541760471765368,-13.590693491823675,8,8,True,ok,reduced,float64,8209,,nan,8,,False,failed,reduced,float64,,MRPT2 numerical residual or metric check failed
+multi,5.0,2.8,-16.2524135875897,-16.17274501181753,-16.23031421268985,8,8,True,ok,reduced,float64,8382,,nan,8,,False,failed,reduced,float64,,MRPT2 numerical residual or metric check failed
+multi,5.0,3.2,-19.039227943310348,-18.946711123396515,-18.994225205467195,8,8,True,ok,reduced,float64,8601,,nan,8,,False,failed,reduced,float64,,MRPT2 numerical residual or metric check failed
+multi,5.0,3.6,-21.93892442358019,-21.861463401817918,-21.893499588352565,9,9,True,ok,reduced,float64,12299,,nan,9,,False,failed,reduced,float64,,MRPT2 numerical residual or metric check failed
+multi,5.0,4.0,-24.925942921721166,-24.87328358502855,-24.895357740392217,10,10,True,ok,reduced,float64,17264,,nan,10,,False,failed,reduced,float64,,h_external congruence asymmetry exceeds roundoff bound: 9.118168350835012e-06

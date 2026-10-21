@@ -1,0 +1,19 @@
+{
+  "stop_reason": "max_total 7 reached",
+  "case": "multi",
+  "omega": 0.5,
+  "alpha": 2.0,
+  "character": -1,
+  "mr_energy": -10.20958457517375,
+  "reference_cut": 1e-10,
+  "tol": 1e-30,
+  "consecutive": 2,
+  "converged_M": {
+    "1e-08": null,
+    "1e-10": null
+  },
+  "max_M": {
+    "1e-08": 7,
+    "1e-10": 7
+  }
+}

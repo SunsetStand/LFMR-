@@ -135,6 +135,22 @@ Historical multi-electron M5 MRPT2 data have numerical acceptance but no
 established photon convergence; their flags remain unchanged. No larger
 basis or complete candidate-space convergence is implied by this release.
 
+## Converged Hubbard–Holstein MRPT2 results
+
+The [four-site phonon-cutoff study](results/mrpt2_phonon_cutoff_convergence/README.md)
+contains the original HPC histories, summary tables and final PNG/PDF figures.
+All 16 single-electron and 22 four-electron points meet two successive
+`|E(M)-E(M-1)| < 1e-6` at external overlap cut `1e-8`, with `3 <= M* <= 14`.
+Failures at the tighter `1e-10` cut remain recorded separately.
+These histories provide the later cutoff-converged results; the earlier
+finite-cutoff tables in `reference_data/` retain their original values and flags.
+
+To redraw from the sibling research checkout (with this repository at `si/`):
+
+```bash
+python -m benchmarks.si.plot_mrpt2_convergence --runs si/results/mrpt2_phonon_cutoff_convergence/history --output-dir outputs/mrpt2_m_converged/figures
+```
+
 ## Research workflows and verification
 
 Automated regression tests, cutoff scans, multistart searches, independent

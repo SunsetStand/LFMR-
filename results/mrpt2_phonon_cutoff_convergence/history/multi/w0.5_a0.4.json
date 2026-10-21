@@ -1,0 +1,19 @@
+{
+  "stop_reason": "converged",
+  "case": "multi",
+  "omega": 0.5,
+  "alpha": 0.4,
+  "character": -1,
+  "mr_energy": -3.721918701727178,
+  "reference_cut": 1e-10,
+  "tol": 1e-06,
+  "consecutive": 2,
+  "converged_M": {
+    "1e-08": 4,
+    "1e-10": 4
+  },
+  "max_M": {
+    "1e-08": 4,
+    "1e-10": 4
+  }
+}
